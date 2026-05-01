@@ -1,0 +1,5 @@
+Claimant Name: Jeevanraj
+
+Incident Type: Theft
+Description: Jewellery stolen .
+Estimated Claim Value: ₹10000
