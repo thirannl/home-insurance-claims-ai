@@ -71,12 +71,29 @@ async def submit_new_claim(
         claim_id = c_result.fetchone()[0]
         db.commit()
 
+        # Extract full claim text for assessment
+        from app.services.file_service import FileService
+        final_claim_text = claim_text
+        if not final_claim_text and claim_path:
+            final_claim_text = await FileService.get_document_text(claim_path)
+            
+        # Trigger assessment via Groq/FAISS Pipeline
+        from app.rag.pipeline import rag_pipeline
+        assessment = await rag_pipeline.process_assessment(db, claim_id, str(final_claim_text))
+
+        try:
+            import json
+            parsed_assessment = json.loads(assessment)
+        except Exception:
+            parsed_assessment = assessment
+
         # Return successful upload details
         return {
-            "message": "Policy and claim uploaded successfully",
+            "message": "Policy and claim processed and assessed successfully",
             "claim_id": claim_id,
             "policy_id": policy_id,
-            "status": "Ready for Assessment"
+            "status": "Assessed",
+            "assessment": parsed_assessment
         }
 
     except Exception as e:
