@@ -15,18 +15,24 @@ class UploadService:
         Extracts text from policy, chunks it with LangChain, and creates FAISS index.
         """
         # 1. Extract Text
+        print("    -> Extracting text from policy file...")
         text_content = await FileService.get_document_text(file_path)
+        print(f"    -> Extracted {len(text_content)} characters.")
         
         # 2. Chunk Text using LangChain's RecursiveCharacterTextSplitter
+        print("    -> Chunking text...")
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=500,
             chunk_overlap=50,
             length_function=len
         )
         chunks = text_splitter.split_text(text_content)
+        print(f"    -> Created {len(chunks)} chunks.")
         
         # 3. Create and Save FAISS Index (LangChain handles embeddings internally now)
+        print("    -> Generating embeddings and saving FAISS index...")
         vector_service.create_and_save_index(chunks, policy_id)
+        print("    -> FAISS index saved.")
         
         return len(chunks)
 

@@ -40,23 +40,33 @@ async def submit_new_claim(
         raise HTTPException(status_code=400, detail="Please provide a claim file or claim text.")
 
     try:
+        print(f"--- Starting upload for {customer_name} ---")
         # 1. Process Policy
+        print("Saving policy file...")
         policy_path = await UploadService.save_upload(policy_file, "policies")
+        print(f"Policy saved at {policy_path}")
         
         # Insert Policy into DB
+        print("Inserting policy into database...")
         p_query = text("INSERT INTO policy (location) VALUES (:loc) RETURNING policy_id")
         p_result = db.execute(p_query, {"loc": policy_path})
         policy_id = p_result.fetchone()[0]
+        print(f"Policy inserted with ID: {policy_id}")
         
         # Index Policy for RAG (For future use by teammates)
+        print("Processing and indexing policy for RAG...")
         await UploadService.process_policy(db, policy_path, str(policy_id))
+        print("Policy indexing complete.")
 
         # 2. Process Claim
+        print("Saving claim file...")
         claim_path = None
         if claim_file:
             claim_path = await UploadService.save_upload(claim_file, "claims")
+            print(f"Claim saved at {claim_path}")
         
         # Insert Claim into DB
+        print("Inserting claim into database...")
         c_query = text("""
             INSERT INTO claim (policy_id, customer_name, claim_type, result)
             VALUES (:p_id, :c_name, :c_type, :res)
@@ -70,6 +80,7 @@ async def submit_new_claim(
         })
         claim_id = c_result.fetchone()[0]
         db.commit()
+        print(f"Claim inserted with ID: {claim_id}. Transaction committed.")
 
         # Extract full claim text for assessment
         from app.services.file_service import FileService

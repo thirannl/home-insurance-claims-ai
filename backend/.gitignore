@@ -14,6 +14,7 @@ venv.bak/
 # Environment variables
 .env
 
+
 # Project specific
 app/uploads/
 app/vector_store/

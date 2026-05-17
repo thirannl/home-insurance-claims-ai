@@ -28,19 +28,7 @@ def test_connection():
         print(f"Total tables found: {len(tables)}")
         print("Tables list:", ", ".join(tables))
         
-        # 2. Check Assessors Table
-        if 'assessors' in tables:
-            print("\n--- Rows in 'assessors' table ---")
-            with engine.connect() as connection:
-                result = connection.execute(text("SELECT id, email, full_name, role FROM assessors LIMIT 5"))
-                rows = result.fetchall()
-                
-                if not rows:
-                    print("No rows found in 'assessors' table.")
-                for row in rows:
-                    print(f"ID: {row.id} | Email: {row.email} | Name: {row.full_name} | Role: {row.role}")
-        else:
-            print("\n⚠️ 'assessors' table not found. Have you run the schema.sql yet?")
+        
             
     except Exception as e:
         print(f"\n❌ Connection Failed!")
