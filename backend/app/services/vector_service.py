@@ -34,8 +34,8 @@ class VectorService:
         """
         folder_path = os.path.join(FAISS_INDEX_DIR, f"policy_{policy_id}")
         
-        if not os.path.exists(folder_path):
-            print(f"Index for {policy_id} not found at {folder_path}")
+        if not os.path.exists(os.path.join(folder_path, "index.faiss")):
+            print(f"Index for {policy_id} not found at {os.path.join(folder_path, 'index.faiss')}")
             return []
             
         # Load the index

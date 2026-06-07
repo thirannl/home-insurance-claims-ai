@@ -112,6 +112,38 @@ async def submit_new_claim(
         print(f"Unified upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Error during unified upload: {str(e)}")
 
+@router.get("/policy/{policy_id}/claims")
+async def get_claims_by_policy(policy_id: int, db: Session = Depends(get_db)):
+    """
+    Retrieves all claims submitted for a specific policy.
+    """
+    query = text("SELECT * FROM claim WHERE policy_id = :pid ORDER BY claim_id DESC")
+    results = db.execute(query, {"pid": policy_id}).fetchall()
+
+    if not results:
+        raise HTTPException(status_code=404, detail=f"No claims found for policy_id {policy_id}")
+
+    claims = []
+    for row in results:
+        try:
+            assessment = json.loads(row.result) if row.result else None
+        except Exception:
+            assessment = row.result
+
+        claims.append({
+            "claim_id":      row.claim_id,
+            "customer_name": row.customer_name,
+            "claim_type":    row.claim_type,
+            "assessment":    assessment
+        })
+
+    return {
+        "policy_id":   policy_id,
+        "total_claims": len(claims),
+        "claims":      claims
+    }
+
+
 @router.get("/{claim_id}")
 async def get_claim_status(claim_id: int, db: Session = Depends(get_db)):
     """
