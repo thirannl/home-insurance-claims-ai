@@ -1,0 +1,98 @@
+# Frontend Developer Guide: Home Insurance Claims AI
+
+Welcome! The backend for the Home Insurance Claims AI system is fully complete and running via FastAPI on `http://127.0.0.1:8000`. 
+This document outlines everything you need to know about how the backend functions and how you should build the frontend to connect seamlessly.
+
+---
+
+## 🏗️ 1. Architecture Overview
+The backend evaluates insurance claims autonomously. 
+1. **Database:** Supabase (PostgreSQL) stores assessor credentials and basic claim/policy identifiers.
+2. **AI & RAG:** When documents (Policies, T&Cs) are uploaded, they are parsed (Supports `.txt`, `.json`, `.pdf`, `.docx`) and stored locally in a FAISS vector database.
+3. **Evaluation Logic:** Upon submitting a claim, the backend searches FAISS for relevant policy/T&C rules, and passes them along with the claim text to a lightning-fast Groq LLM (`llama-3.1-8b-instant`) to instantly decide if a claim is Covered, Not Covered, or Needs Human Review.
+
+---
+
+## 🔌 2. API Endpoints for Frontend
+
+### A. Authentication
+**Endpoint:** `POST /auth/login`
+**Description:** Authenticates the insurance accessor.
+**Body (JSON):**
+```json
+{
+  "accessor_id": "your-id",
+  "password": "your-password"
+}
+```
+**Response (200):** Returns a JWT token to be used as a Bearer token in subsequent requests (if auth dependencies are strictly turned on in the backend routes).
+```json
+{
+  "access_token": "eyJhbGciOi...",
+  "token_type": "bearer",
+  "name": "Accessor Name"
+}
+```
+
+### B. Global Terms & Conditions Upload (Admin/Setup)
+**Endpoint:** `POST /upload/tc`
+**Description:** Use this to set the universal terms and conditions. The backend automatically parses and populates the FAISS vector DB.
+**Body (Multipart Form-Data):**
+* `file`: (File) The T&C document (`.pdf`, `.docx`, etc.)
+
+---
+
+### C. The Core Engine: Submit Claim + Policy
+**Endpoint:** `POST /upload/submit`
+**Description:** The primary endpoint. It takes the claimant's details, the main policy file, and the claim statement. It waits for the AI to assess it, and returns the full JSON decision immediately.
+**Body (Multipart Form-Data):**
+* `customer_name` (String): e.g., "John Doe"
+* `claim_type` (String): e.g., "fire", "flood", "earthquake"
+* `policy_file` (File): The customer's specific policy document.
+* `claim_file` (File, Optional): The official claim document.
+* `claim_text` (String, Optional): The raw text of the claim (If a file isn't uploaded).
+
+**Response (200 OK):**
+```json
+{
+  "message": "Policy and claim processed and assessed successfully",
+  "claim_id": 12,
+  "policy_id": 11,
+  "status": "Assessed",
+  "assessment": {
+    "decision": "Covered" | "Not Covered" | "Needs Human Review",
+    "justification": "Explanation based precisely on the policy and limits...",
+    "flags": [
+      "Claim exceeds policy limit",
+      "Endorsement missing"
+    ]
+  }
+}
+```
+
+### D. Get Claim Status (Historical)
+**Endpoint:** `GET /upload/{claim_id}`
+**Description:** Fetches the status of a past claim from the database.
+
+---
+
+## 🎨 3. Suggested Frontend UI Flow
+
+To ensure a seamless user experience, we recommend building the frontend UI (e.g., React, Next.js, or Vue) with the following screens:
+
+1. **Login Page:** Standard ID and Password fields pointing to `/auth/login`.
+2. **Dashboard Overview:** A centralized hub showing previously submitted claims or statuses. 
+3. **"Master Setup" Modal:** A hidden or admin-specific interface to upload the Global T&C document (hits `/upload/tc`). This only needs to be done once/infrequently.
+4. **"New Claim Assessment" Page:** The main focal piece.
+   * **Left Side (Input):** Form fields for `Customer Name` and `Claim Type`. Drag-and-drop zones for `Policy Document` and `Claim Document`. Optionally, a text area if they want to type the claim out instead of uploading it.
+   * **Right Side (AI Output):** Once the user clicks "Evaluate Claim", show a spinning/loading state. When the 200 response comes back from `/upload/submit`, display the AI `assessment` payload.
+   * Use color coding for the `decision` (Green for Covered, Red for Not Covered, Yellow/Orange for Needs Human Review).
+   * Present the `justification` as the core paragraph.
+   * Display `flags` as actionable alert chips.
+
+## ⚙️ 4. Handling Technical Gotchas
+* **CORS:** Ensure your frontend runs on a port allowed by the FastAPI CORS middleware (typically localhost:3000 or 5173). 
+* **Loading States:** The `/upload/submit` route performs Database Writes, FAISS Embeddings, and an LLM network call. It is fast (thanks to Groq), but your UI should absolutely show a "Analyzing Documents..." loading spinner for a few seconds so the user knows work is being done.
+* **File Types:** The backend seamlessly handles `.pdf`, `.docx`, `.doc`, `.txt`, and `.json`. You do not need to parse these on the frontend; just ship the raw `File` blob directly in the `FormData`.
+
+Good luck! You've got a powerhouse backend behind you!
