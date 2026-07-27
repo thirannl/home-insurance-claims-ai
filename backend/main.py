@@ -1,3 +1,9 @@
+from dotenv import load_dotenv
+# Load .env FIRST — before any app import that triggers the EmbeddingService
+# singleton (embedding_service.py), so HF_HUB_OFFLINE & TRANSFORMERS_OFFLINE
+# are already set when sentence-transformers initialises.
+load_dotenv(override=True)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import auth, uploads

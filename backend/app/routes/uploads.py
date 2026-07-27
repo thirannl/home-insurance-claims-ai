@@ -51,6 +51,9 @@ async def submit_new_claim(
         p_query = text("INSERT INTO policy (location) VALUES (:loc) RETURNING policy_id")
         p_result = db.execute(p_query, {"loc": policy_path})
         policy_id = p_result.fetchone()[0]
+        # Commit NOW so vector_service's separate SessionLocal can see the policy row
+        # (FK constraint on policy_chunks.policy_id requires it to exist in policy table)
+        db.commit()
         print(f"Policy inserted with ID: {policy_id}")
         
         # Index Policy for RAG (For future use by teammates)
