@@ -14,10 +14,29 @@ Automated insurance claim assessment using RAG.
 ## Status: Step-by-Step Implementation
 Current Phase: Phase 4 (Vector Storage with FAISS)
 
+## Setup & Installation
+1. Create a virtual environment:
+   ```powershell
+   python -m venv venv
+   ```
+2. Activate the virtual environment:
+   ```powershell
+   .\venv\Scripts\activate
+   ```
+3. Install dependencies:
+   ```powershell
+   pip install -r requirements.txt
+   ```
+
 ## Running the Server
-To start the FastAPI server:
+You can start the FastAPI server using the provided PowerShell script (which automatically activates the virtual environment):
 ```powershell
 .\run.ps1
+```
+
+Alternatively, you can run it manually with Uvicorn (make sure your virtual environment is active):
+```powershell
+uvicorn main:app --reload
 ```
 
 ## Testing the API

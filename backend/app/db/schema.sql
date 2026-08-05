@@ -49,7 +49,6 @@ CREATE TABLE IF NOT EXISTS tc_chunks (
     version TEXT DEFAULT '1.0',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- 6. Claims Table
 CREATE TABLE IF NOT EXISTS claims (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

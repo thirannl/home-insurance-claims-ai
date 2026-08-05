@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db.database import get_db
 from app.services.upload_service import UploadService
+from app.routes.auth import get_current_accessor
+from pydantic import BaseModel
+from typing import Optional
 import uuid
 import json
 
@@ -137,7 +140,10 @@ async def get_claims_by_policy(policy_id: int, db: Session = Depends(get_db)):
             "claim_id":      row.claim_id,
             "customer_name": row.customer_name,
             "claim_type":    row.claim_type,
-            "assessment":    assessment
+            "assessment":    assessment,
+            "final_decision": getattr(row, 'final_decision', None),
+            "reviewed_by":   getattr(row, 'reviewed_by', None),
+            "reviewed_at":   getattr(row, 'reviewed_at', None)
         })
 
     return {
@@ -147,16 +153,102 @@ async def get_claims_by_policy(policy_id: int, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/claims")
+async def get_all_claims(db: Session = Depends(get_db)):
+    """
+    Returns all claims with fully parsed AI assessment results, newest first.
+    Used by the Dashboard to display and inspect claims from the DB.
+    """
+    query = text("SELECT * FROM claim ORDER BY claim_id DESC")
+    results = db.execute(query).fetchall()
+
+    claims = []
+    for row in results:
+        try:
+            assessment = json.loads(row.result) if row.result else {}
+        except Exception:
+            assessment = {}
+
+        claims.append({
+            "claim_id":      row.claim_id,
+            "policy_id":     row.policy_id,
+            "customer_name": row.customer_name,
+            "claim_type":    row.claim_type,
+            "decision":      assessment.get("decision", "Pending"),
+            "justification": assessment.get("justification", ""),
+            "flags":         assessment.get("flags", []),
+            "final_decision": getattr(row, 'final_decision', None),
+            "reviewed_by":   getattr(row, 'reviewed_by', None),
+            "reviewed_at":   getattr(row, 'reviewed_at', None)
+        })
+
+    return {"total": len(claims), "claims": claims}
+
+
 @router.get("/{claim_id}")
 async def get_claim_status(claim_id: int, db: Session = Depends(get_db)):
     """
-    Retrieves the status of a claim.
+    Retrieves the full parsed assessment for a single claim by ID.
     """
     query = text("SELECT * FROM claim WHERE claim_id = :id")
     result = db.execute(query, {"id": claim_id}).fetchone()
     if not result:
         raise HTTPException(status_code=404, detail="Claim not found")
+
+    try:
+        assessment = json.loads(result.result) if result.result else {}
+    except Exception:
+        assessment = {}
+
     return {
+        "claim_id":      result.claim_id,
+        "policy_id":     result.policy_id,
+        "customer_name": result.customer_name,
+        "claim_type":    result.claim_type,
+        "decision":      assessment.get("decision", "Pending"),
+        "justification": assessment.get("justification", ""),
+        "flags":         assessment.get("flags", []),
+        "final_decision": getattr(result, 'final_decision', None),
+        "reviewed_by":   getattr(result, 'reviewed_by', None),
+        "reviewed_at":   getattr(result, 'reviewed_at', None)
+    }
+
+class ReviewPayload(BaseModel):
+    final_decision: str
+    reviewer_note: Optional[str] = None
+
+@router.patch("/{claim_id}/review")
+async def review_claim(
+    claim_id: int, 
+    payload: ReviewPayload, 
+    db: Session = Depends(get_db), 
+    current_user: dict = Depends(get_current_accessor)
+):
+    """
+    Allows a human accessor to override the AI decision.
+    """
+    query = text("""
+        UPDATE claim 
+        SET final_decision = :fd, 
+            reviewed_by = :accessor_id, 
+            reviewed_at = NOW() 
+        WHERE claim_id = :id
+        RETURNING claim_id, final_decision, reviewed_by, reviewed_at
+    """)
+    result = db.execute(query, {
+        "fd": payload.final_decision,
+        "accessor_id": current_user.get("accessor_id"),
+        "id": claim_id
+    }).fetchone()
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Claim not found")
+        
+    db.commit()
+    return {
+        "message": "Claim reviewed successfully",
         "claim_id": result.claim_id,
-        "status": result.result
+        "final_decision": result.final_decision,
+        "reviewed_by": result.reviewed_by,
+        "reviewed_at": result.reviewed_at
     }

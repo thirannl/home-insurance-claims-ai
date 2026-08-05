@@ -40,3 +40,20 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "name": result.name
     }
+
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
+from app.auth.auth_handler import SECRET_KEY, ALGORITHM
+
+security = HTTPBearer()
+
+def get_current_accessor(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        accessor_id: str = payload.get("sub")
+        if accessor_id is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        return {"accessor_id": accessor_id}
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")

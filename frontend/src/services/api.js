@@ -5,6 +5,23 @@
 
 const BASE_URL = '/api';
 
+// ─── Shared authenticated fetch ──────────────────────────────────────────────
+/**
+ * Wraps fetch and auto-handles 401 (expired/invalid token) by clearing
+ * localStorage and redirecting to the login page.
+ */
+async function authFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    // Token expired or invalid — force re-login
+    localStorage.removeItem('token');
+    localStorage.removeItem('name');
+    window.location.href = '/'; // redirect to login
+    throw new Error('Your session has expired. Please log in again.');
+  }
+  return res;
+}
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 /**
@@ -79,17 +96,56 @@ export async function submitClaim(fields, policyFile, claimFile, token) {
 }
 
 /**
+ * Fetch all claims (live from DB) — includes final_decision, reviewed_by, reviewed_at.
+ * Used by the Dashboard to always show up-to-date override status.
+ * @param {string} token  Bearer token
+ */
+export async function getAllClaims(token) {
+  const res = await fetch(`${BASE_URL}/upload/claims`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to load claims');
+  }
+  return res.json(); // { total, claims: [...] }
+}
+
+/**
  * Get the status / result of a specific claim by ID.
  * @param {number} claimId
  * @param {string} token  Bearer token
  */
 export async function getClaimStatus(claimId, token) {
+
   const res = await fetch(`${BASE_URL}/upload/${claimId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || 'Claim not found');
+  }
+  return res.json();
+}
+
+/**
+ * Override the AI decision.
+ * @param {number} claimId
+ * @param {string} finalDecision "Covered" | "Not Covered"
+ * @param {string} token Bearer token
+ */
+export async function overrideClaimDecision(claimId, finalDecision, token) {
+  const res = await authFetch(`${BASE_URL}/upload/${claimId}/review`, {
+    method: 'PATCH',
+    headers: { 
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}` 
+    },
+    body: JSON.stringify({ final_decision: finalDecision })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to submit review');
   }
   return res.json();
 }
